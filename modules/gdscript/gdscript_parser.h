@@ -910,6 +910,8 @@ public:
 
 		int usages = 0; // Useful for binds/iterator variable.
 
+		bool is_private = false; // When true, throw an error if a different object attempts to access.
+
 		IdentifierNode() {
 			type = IDENTIFIER;
 		}
@@ -1504,6 +1506,7 @@ private:
 	bool warning_annotations(const AnnotationNode *p_annotation, Node *p_target, ClassNode *p_class);
 	bool rpc_annotation(const AnnotationNode *p_annotation, Node *p_target, ClassNode *p_class);
 	bool static_unload_annotation(const AnnotationNode *p_annotation, Node *p_target, ClassNode *p_class);
+	bool private_access_annotation(const AnnotationNode *p_annotation, Node *p_target, ClassNode *p_class);
 	// Statements.
 	Node *parse_statement();
 	VariableNode *parse_variable(bool p_is_static);

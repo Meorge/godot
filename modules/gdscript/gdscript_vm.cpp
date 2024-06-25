@@ -1732,6 +1732,28 @@ Variant GDScriptFunction::call(GDScriptInstance *p_instance, const Variant **p_a
 #endif
 
 				Callable::CallError err;
+
+				Object *calling_object = p_instance->get_owner();
+				Object *callee_object = *base;
+
+				if (calling_object != callee_object) {
+					// If calling object is not the same as the callee object, then this method must not
+					// be marked `@private` in order for it to run.
+
+					// HACK: Currently just iterating through all of the methods on the callee to find
+					// the one that matches, and check if it's marked private.
+					// It'd probably be better to add a new method to Object, which given a method name,
+					// determines if it is private or not.
+					List<MethodInfo> ml;
+					callee_object->get_method_list(&ml);
+					for (const MethodInfo &method_info : ml) {
+						if (method_info.name == *methodname && method_info.flags & METHOD_FLAG_PRIVATE) {
+							err_text = R"(Trying to call a method marked @private from another class.)";
+							OPCODE_BREAK;
+						}
+					}
+				}
+
 				if (call_ret) {
 					GET_INSTRUCTION_ARG(ret, argc + 1);
 					base->callp(*methodname, (const Variant **)argptrs, argc, *ret, err);

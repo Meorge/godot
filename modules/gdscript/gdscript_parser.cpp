@@ -130,6 +130,8 @@ GDScriptParser::GDScriptParser() {
 		register_annotation(MethodInfo("@warning_ignore", PropertyInfo(Variant::STRING, "warning")), AnnotationInfo::CLASS_LEVEL | AnnotationInfo::STATEMENT, &GDScriptParser::warning_annotations, varray(), true);
 		// Networking.
 		register_annotation(MethodInfo("@rpc", PropertyInfo(Variant::STRING, "mode"), PropertyInfo(Variant::STRING, "sync"), PropertyInfo(Variant::STRING, "transfer_mode"), PropertyInfo(Variant::INT, "transfer_channel")), AnnotationInfo::FUNCTION, &GDScriptParser::rpc_annotation, varray("authority", "call_remote", "unreliable", 0));
+		// Access control annotations.
+		register_annotation(MethodInfo("@private"), AnnotationInfo::VARIABLE | AnnotationInfo::FUNCTION | AnnotationInfo::CONSTANT, &GDScriptParser::private_access_annotation);
 	}
 
 #ifdef DEBUG_ENABLED
@@ -4685,6 +4687,25 @@ bool GDScriptParser::static_unload_annotation(const AnnotationNode *p_annotation
 		return false;
 	}
 	class_node->annotated_static_unload = true;
+	return true;
+}
+
+bool GDScriptParser::private_access_annotation(const AnnotationNode *p_annotation, Node *p_target, ClassNode *p_class) {
+	ERR_FAIL_COND_V_MSG(p_target->type != Node::VARIABLE && p_target->type != Node::FUNCTION && p_target->type != Node::CONSTANT, false, R"("@private" annotation can only be applied to variables, functions, and constants.)");
+
+	if (p_target->type == Node::VARIABLE) {
+		VariableNode *variable = static_cast<VariableNode *>(p_target);
+		variable->identifier->is_private = true;
+	} else if (p_target->type == Node::FUNCTION) {
+		FunctionNode *function = static_cast<FunctionNode *>(p_target);
+		function->identifier->is_private = true;
+	} else if (p_target->type == Node::CONSTANT) {
+		ConstantNode *constant = static_cast<ConstantNode *>(p_target);
+		constant->identifier->is_private = true;
+	} else {
+		push_error(vformat(R"("@private" annotation can't be used with the provided type.)"));
+		return false;
+	}
 	return true;
 }
 

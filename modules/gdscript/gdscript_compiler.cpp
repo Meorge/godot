@@ -2219,6 +2219,7 @@ GDScriptFunction *GDScriptCompiler::_parse_function(Error &r_error, GDScript *p_
 
 	StringName func_name;
 	bool is_static = false;
+	bool is_private = false;
 	Variant rpc_config;
 	GDScriptDataType return_type;
 	return_type.has_type = true;
@@ -2232,6 +2233,7 @@ GDScriptFunction *GDScriptCompiler::_parse_function(Error &r_error, GDScript *p_
 			func_name = "<anonymous lambda>";
 		}
 		is_static = p_func->is_static;
+		is_private = p_func->identifier->is_private;
 		rpc_config = p_func->rpc_config;
 		return_type = _gdtype_from_datatype(p_func->get_datatype(), p_script);
 	} else {
@@ -2250,6 +2252,11 @@ GDScriptFunction *GDScriptCompiler::_parse_function(Error &r_error, GDScript *p_
 	if (is_static) {
 		method_info.flags |= METHOD_FLAG_STATIC;
 	}
+
+	if (is_private) {
+		method_info.flags |= METHOD_FLAG_PRIVATE;
+	}
+
 	codegen.generator->write_start(p_script, func_name, is_static, rpc_config, return_type);
 
 	int optional_parameters = 0;
