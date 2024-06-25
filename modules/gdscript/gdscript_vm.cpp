@@ -1155,6 +1155,25 @@ Variant GDScriptFunction::call(GDScriptInstance *p_instance, const Variant **p_a
 				GD_ERR_BREAK(indexname < 0 || indexname >= _global_names_count);
 				const StringName *index = &_global_names_ptr[indexname];
 
+				Object *calling_object = p_instance->get_owner();
+				Object *callee_object = *src;
+
+				print_line(vformat(R"(OPCODE_GET_NAMED - %s is trying to get %s.%s)", calling_object, callee_object, *index));
+				if (calling_object != callee_object) {
+					List<PropertyInfo> pl;
+					callee_object->get_property_list(&pl);
+					for (const PropertyInfo &property_info : pl) {
+						// ERROR: At this point, PROPERTY_USAGE_PRIVATE isn't set on `src.get_property_list()[x].property_info.usage` as it should be.
+						// It must not be the same instance of PropertyInfo that we have access to and modify in the parser during the annotation.
+						// Somehow we need to get the same instance/data to check it here.
+						print_line(vformat(R"(OPCODE_GET_NAMED - comparing property_info.name="%s" to *index="%s" and usage is %s)", property_info.name, *index, property_info.usage));
+						if (property_info.name == *index && property_info.usage & PROPERTY_USAGE_PRIVATE) {
+							err_text = R"(Trying to access the value of a property marked @private from another class.)";
+							OPCODE_BREAK;
+						}
+					}
+				}
+
 				bool valid;
 #ifdef DEBUG_ENABLED
 				//allow better error message in cases where src and dst are the same stack position
@@ -1219,6 +1238,7 @@ Variant GDScriptFunction::call(GDScriptInstance *p_instance, const Variant **p_a
 				int indexname = _code_ptr[ip + 2];
 				GD_ERR_BREAK(indexname < 0 || indexname >= _global_names_count);
 				const StringName *index = &_global_names_ptr[indexname];
+				print_line(vformat(R"(OPCODE_GET_MEMBER index=%s)", index));
 #ifndef DEBUG_ENABLED
 				ClassDB::get_property(p_instance->owner, *index, *dst);
 #else
