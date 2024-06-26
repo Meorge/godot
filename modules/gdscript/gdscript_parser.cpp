@@ -4696,7 +4696,6 @@ bool GDScriptParser::private_access_annotation(const AnnotationNode *p_annotatio
 	if (p_target->type == Node::VARIABLE) {
 		VariableNode *variable = static_cast<VariableNode *>(p_target);
 		variable->identifier->is_private = true;
-		variable->export_info.usage |= PROPERTY_USAGE_PRIVATE;
 	} else if (p_target->type == Node::FUNCTION) {
 		FunctionNode *function = static_cast<FunctionNode *>(p_target);
 		function->identifier->is_private = true;

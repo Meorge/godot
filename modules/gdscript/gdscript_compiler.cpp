@@ -2768,6 +2768,10 @@ Error GDScriptCompiler::_prepare_compilation(GDScript *p_script, const GDScriptP
 				PropertyInfo prop_info = variable->get_datatype().to_property_info(name);
 				PropertyInfo export_info = variable->export_info;
 
+				if (variable->identifier->is_private) {
+					prop_info.usage |= PROPERTY_USAGE_PRIVATE;
+				}
+
 				if (variable->exported) {
 					if (!minfo.data_type.has_type) {
 						prop_info.type = export_info.type;
