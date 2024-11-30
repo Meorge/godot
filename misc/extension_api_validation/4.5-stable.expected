@@ -136,3 +136,11 @@ GH-109302
 Validate extension JSON: Error: Field 'classes/OpenXRExtensionWrapper/methods/_set_instance_create_info_and_get_next_pointer/arguments': size changed value in new API, from 1 to 2.
 Validate extension JSON: Error: Field 'classes/OpenXRExtensionWrapper/methods/_set_instance_create_info_and_get_next_pointer/arguments/0': type changed value in new API, from "void*" to "int".
 Validate extension JSON: JSON file: Field was added in a way that breaks compatibility 'classes/OpenXRExtensionWrapper/methods/_get_requested_extensions': arguments
+
+
+GH-100019
+---------
+Validate extension JSON: Error: Field 'classes/CodeEdit/methods/add_code_completion_option/arguments': size changed value in new API, from 6 to 8.
+Validate extension JSON: Error: Field 'classes/CodeEdit/methods/add_code_completion_option/arguments': size changed value in new API, from 7 to 8.
+
+New argument `deprecated` added to `add_code_completion_option`. Compatibility method registered.
