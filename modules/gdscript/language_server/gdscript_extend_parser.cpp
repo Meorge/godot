@@ -157,16 +157,27 @@ void ExtendGDScriptParser::update_diagnostics() {
 		diagnostic.message = "(" + warning.get_name() + "): " + warning.get_message();
 		diagnostic.source = "gdscript";
 		diagnostic.code = warning.code;
-		LSP::Range range;
-		LSP::Position pos;
-		int line = LINE_NUMBER_TO_INDEX(warning.start_line);
-		const String &line_text = get_lines()[line];
-		pos.line = line;
-		pos.character = line_text.length() - line_text.strip_edges(true, false).length();
-		range.start = pos;
-		range.end = pos;
-		range.end.character = line_text.strip_edges(false).length();
-		diagnostic.range = range;
+
+		// ISSUE: Godot treats a tab as worth 4 characters, whereas the language server
+		// treats it as a single character.
+		LSP::Range new_range;
+		new_range.start.line = warning.start_line - 1;
+		new_range.start.character = warning.leftmost_column - 1;
+		new_range.end.line = warning.end_line - 1;
+		new_range.end.character = warning.rightmost_column - 1;
+
+		print_line(vformat("Line %s from col %s to col %s", warning.start_line, warning.leftmost_column, warning.rightmost_column));
+
+		// LSP::Range range;
+		// LSP::Position pos;
+		// int line = LINE_NUMBER_TO_INDEX(warning.start_line);
+		// const String &line_text = get_lines()[line];
+		// pos.line = line;
+		// pos.character = line_text.length() - line_text.strip_edges(true, false).length();
+		// range.start = pos;
+		// range.end = pos;
+		// range.end.character = line_text.strip_edges(false).length();
+		diagnostic.range = new_range;
 		diagnostics.push_back(diagnostic);
 	}
 }
