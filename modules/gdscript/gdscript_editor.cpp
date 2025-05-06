@@ -1436,7 +1436,7 @@ static void _find_identifiers_in_base(const GDScriptCompletionIdentifier &p_base
 
 					HashSet<String> deprecated_consts;
 					if (!class_doc_map.has(type)) {
-						print_line(vformat(R"(Class "%s" couldn't be found in doc data by the language server.)", type));
+						print_error(vformat(R"(Class "%s" couldn't be found in doc data.)", type));
 					} else {
 						for (const DocData::ConstantDoc &constant_doc : class_doc_map.get(type).constants) {
 							if (constant_doc.is_deprecated) {
@@ -1461,7 +1461,7 @@ static void _find_identifiers_in_base(const GDScriptCompletionIdentifier &p_base
 
 						HashSet<String> deprecated_properties;
 						if (!class_doc_map.has(type)) {
-							print_line(vformat(R"(Class "%s" couldn't be found in doc data by the language server.)", type));
+							print_error(vformat(R"(Class "%s" couldn't be found in doc data.)", type));
 						} else {
 							for (const DocData::PropertyDoc &property_doc : class_doc_map.get(type).properties) {
 								if (property_doc.is_deprecated) {
@@ -1492,7 +1492,7 @@ static void _find_identifiers_in_base(const GDScriptCompletionIdentifier &p_base
 
 						HashSet<String> deprecated_signals;
 						if (!class_doc_map.has(type)) {
-							print_line(vformat(R"(Class "%s" couldn't be found in doc data by the language server.)", type));
+							print_error(vformat(R"(Class "%s" couldn't be found in doc data.)", type));
 						} else {
 							for (const DocData::MethodDoc &signal_doc : class_doc_map.get(type).signals) {
 								if (signal_doc.is_deprecated) {
@@ -1522,7 +1522,7 @@ static void _find_identifiers_in_base(const GDScriptCompletionIdentifier &p_base
 				// Assemble a set of deprecated method names.
 				HashSet<String> deprecated_methods;
 				if (!class_doc_map.has(type)) {
-					print_line(vformat(R"(Class "%s" couldn't be found in doc data by the language server.)", type));
+					print_error(vformat(R"(Class "%s" couldn't be found in doc data.)", type));
 				} else {
 					for (const DocData::MethodDoc &method_doc : class_doc_map.get(type).methods) {
 						if (method_doc.is_deprecated) {
@@ -1566,16 +1566,16 @@ static void _find_identifiers_in_base(const GDScriptCompletionIdentifier &p_base
 				List<StringName> enum_values;
 				ClassDB::get_enum_constants(type, type_enum, &enum_values);
 
-				if (p_base.type.class_type) {
+				if (p_base.type.class_type && base_type.kind == GDScriptParser::DataType::ENUM) {
 					const GDScriptParser::EnumNode *_enum = p_base.type.class_type->get_member(type_enum).m_enum;
-					for (const GDScriptParser::EnumNode::Value &i : _enum->values) {
-						if (i.doc_data.is_deprecated) {
-							deprecated_values.insert(i.identifier->name);
+					for (const GDScriptParser::EnumNode::Value &enum_value : _enum->values) {
+						if (enum_value.doc_data.is_deprecated) {
+							deprecated_values.insert(enum_value.identifier->name);
 						}
 					}
 				} else {
 					if (!class_doc_map.has(type)) {
-						print_line(vformat(R"(Class "%s" couldn't be found in doc data by the language server.)", type));
+						print_error(vformat(R"(Class "%s" couldn't be found in doc data.)", type));
 					} else {
 						for (const DocData::ConstantDoc &constant_doc : class_doc_map.get(type).constants) {
 							if (constant_doc.is_deprecated) {
@@ -1618,16 +1618,13 @@ static void _find_identifiers_in_base(const GDScriptCompletionIdentifier &p_base
 						tmp.get_property_list(&members);
 					}
 
-					// Handles enum values for non-anonymous enums (like `enum MyEnum { ONE, TWO }` and then `MyEnum.ONE`)
+					// Handles members from Variant types. Since named enums are
+					// internally the Dictionary type, they are also handled here.
 					for (const PropertyInfo &E : members) {
 						if (E.usage & (PROPERTY_USAGE_CATEGORY | PROPERTY_USAGE_GROUP | PROPERTY_USAGE_SUBGROUP | PROPERTY_USAGE_INTERNAL)) {
 							continue;
 						}
 						if (!String(E.name).contains_char('/')) {
-							// Enum value for a named enum in the current class.
-							// 		enum MyEnum { HELLO, GOODBYE }
-							//		...
-							//		MyEnum.HE...  # <-- will suggest `HELLO`
 							ScriptLanguage::CodeCompletionOption option(E.name, ScriptLanguage::CODE_COMPLETION_KIND_MEMBER, location);
 							if (base_type.kind == GDScriptParser::DataType::ENUM) {
 								// Sort enum members in their declaration order.
@@ -1647,7 +1644,7 @@ static void _find_identifiers_in_base(const GDScriptCompletionIdentifier &p_base
 
 				HashSet<String> deprecated_methods;
 				if (!class_doc_map.has(Variant::get_type_name(base_type.builtin_type))) {
-					print_line(vformat(R"(Variant "%s" couldn't be found in doc data by the language server.)", Variant::get_type_name(base_type.builtin_type)));
+					print_error(vformat(R"(Variant "%s" couldn't be found in doc data.)", Variant::get_type_name(base_type.builtin_type)));
 				} else {
 					for (const DocData::MethodDoc &method_doc : class_doc_map.get(Variant::get_type_name(base_type.builtin_type)).methods) {
 						if (method_doc.is_deprecated) {
@@ -1702,13 +1699,10 @@ static void _find_identifiers(const GDScriptParser::CompletionContext &p_context
 	const HashMap<String, DocData::ClassDoc> class_doc_map = EditorHelp::get_doc_data() ? EditorHelp::get_doc_data()->class_list : HashMap<String, DocData::ClassDoc>();
 
 	HashSet<String> deprecated_methods;
-	if (!class_doc_map.has("@GDScript")) {
-		print_line(R"(Class "@GDScript" couldn't be found in doc data by the language server.)");
-	} else {
-		for (const DocData::MethodDoc &method_doc : class_doc_map.get("@GDScript").methods) {
-			if (method_doc.is_deprecated) {
-				deprecated_methods.insert(method_doc.name);
-			}
+	ERR_FAIL_COND_MSG(!class_doc_map.has("@GDScript"), R"(Class "@GDScript" couldn't be found in doc data.)");
+	for (const DocData::MethodDoc &method_doc : class_doc_map.get("@GDScript").methods) {
+		if (method_doc.is_deprecated) {
+			deprecated_methods.insert(method_doc.name);
 		}
 	}
 
@@ -1789,20 +1783,8 @@ static void _find_identifiers(const GDScriptParser::CompletionContext &p_context
 	List<StringName> utility_func_names;
 	Variant::get_utility_function_list(&utility_func_names);
 
-	// Build a set of deprecated constants from @GlobalScope.
-	HashSet<String> deprecated_consts;
-	if (!class_doc_map.has("@GlobalScope")) {
-		print_line(R"(Class "@GlobalScope" couldn't be found in doc data by the language server.)");
-	} else {
-		for (const DocData::ConstantDoc &constant_doc : class_doc_map.get("@GlobalScope").constants) {
-			if (constant_doc.is_deprecated) {
-				deprecated_consts.insert(constant_doc.name);
-			}
-		}
-	}
-
 	for (const StringName &util_func_name : utility_func_names) {
-		// Function in the global scope, at least that deal with Variants.
+		// Function in the global scope.
 		// 		pri...  # <-- will suggest `print(...)`
 		ScriptLanguage::CodeCompletionOption option(util_func_name, ScriptLanguage::CODE_COMPLETION_KIND_FUNCTION);
 		if (p_add_braces) {
@@ -1841,7 +1823,14 @@ static void _find_identifiers(const GDScriptParser::CompletionContext &p_context
 			// Global constants.
 			// 		SIDE_LE...  # <-- will suggest `SIDE_LEFT`
 			option = ScriptLanguage::CodeCompletionOption(name, ScriptLanguage::CODE_COMPLETION_KIND_CONSTANT);
-			option.deprecated = deprecated_consts.has(name);
+
+			ERR_FAIL_COND_MSG(!class_doc_map.has("@GlobalScope"), R"(Class "@GlobalScope" couldn't be found in doc data.)");
+			for (const DocData::ConstantDoc &constant_doc : class_doc_map.get("@GlobalScope").constants) {
+				if (constant_doc.name == name) {
+					option.deprecated = constant_doc.is_deprecated;
+					break;
+				}
+			}
 		}
 		r_result.insert(option.display, option);
 	}
@@ -3131,7 +3120,7 @@ static void _find_enumeration_candidates(GDScriptParser::CompletionContext &p_co
 		// Build set of deprecated enum constants.
 		HashSet<String> deprecated_consts;
 		if (!class_doc_map.has(class_name)) {
-			print_line(vformat(R"(Class "%s" couldn't be found in doc data by the language server.)", class_name));
+			print_error(vformat(R"(Class "%s" couldn't be found in doc data.)", class_name));
 		} else {
 			for (const DocData::ConstantDoc &constant_doc : class_doc_map.get(class_name).constants) {
 				if (constant_doc.is_deprecated) {
@@ -3669,14 +3658,6 @@ static void _find_call_arguments(GDScriptParser::CompletionContext &p_context, c
 				List<StringName> methods;
 				Variant::get_builtin_method_list(completion_context.builtin_type, &methods);
 				const String variant_name = Variant::get_type_name(completion_context.builtin_type);
-
-				// Create set of deprecated methods within this Variant.
-				HashSet<String> deprecated_methods;
-				for (const DocData::MethodDoc &method_doc : class_doc_map.get(variant_name).methods) {
-					if (method_doc.is_deprecated) {
-						deprecated_methods.insert(method_doc.name);
-					}
-				}
 
 				for (const StringName &E : methods) {
 					if (Variant::is_builtin_method_static(completion_context.builtin_type, E)) {
