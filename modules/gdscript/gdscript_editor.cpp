@@ -1066,10 +1066,15 @@ static void _list_available_types(bool p_inherit_only, GDScriptParser::Completio
 					case GDScriptParser::ClassNode::Member::CONSTANT: {
 						if (member.constant->get_datatype().is_meta_type && p_context.current_class->outer != nullptr) {
 							// Preloaded type within this script.
-							// const MyType = preload("res://my_type.gd)
+							// const MyType = preload("res://my_type.gd")
 							// var m: MyT... # <-- will suggest MyType
 							ScriptLanguage::CodeCompletionOption option(member.constant->identifier->name, ScriptLanguage::CODE_COMPLETION_KIND_CLASS, ScriptLanguage::LOCATION_LOCAL);
-							option.deprecated = member.constant->doc_data.is_deprecated;
+
+							bool held_class_is_deprecated = false;
+							if (member.constant->get_datatype().class_type) {
+								held_class_is_deprecated = member.constant->get_datatype().class_type->doc_data.is_deprecated;
+							}
+							option.deprecated = held_class_is_deprecated || member.constant->doc_data.is_deprecated;
 							r_result.insert(option.display, option);
 						}
 					} break;
@@ -1160,7 +1165,7 @@ static void _find_identifiers_in_class(const GDScriptParser::ClassNode *p_class,
 						option = ScriptLanguage::CodeCompletionOption(member.variable->identifier->name, ScriptLanguage::CODE_COMPLETION_KIND_MEMBER, location);
 						option.deprecated = member.variable->doc_data.is_deprecated;
 						break;
-					case GDScriptParser::ClassNode::Member::CONSTANT:
+					case GDScriptParser::ClassNode::Member::CONSTANT: {
 						if (p_types_only || p_only_functions) {
 							continue;
 						}
@@ -1172,11 +1177,19 @@ static void _find_identifiers_in_class(const GDScriptParser::ClassNode *p_class,
 						//		func _ready():
 						// 			print(MY_CON...  # <-- will suggest `MY_CONST`
 						option = ScriptLanguage::CodeCompletionOption(member.constant->identifier->name, ScriptLanguage::CODE_COMPLETION_KIND_CONSTANT, location);
-						option.deprecated = member.constant->doc_data.is_deprecated;
+
+						// This constant holds a script class, so we should check
+						// if the script class is itself deprecated.
+						bool held_class_is_deprecated = false;
+						if (member.constant->get_datatype().is_meta_type && member.constant->get_datatype().class_type) {
+							held_class_is_deprecated = member.constant->get_datatype().class_type->doc_data.is_deprecated;
+						}
+						option.deprecated = held_class_is_deprecated || member.constant->doc_data.is_deprecated;
 						if (member.constant->initializer) {
 							option.default_value = member.constant->initializer->reduced_value;
 						}
 						break;
+					}
 					case GDScriptParser::ClassNode::Member::CLASS:
 						if (p_only_functions) {
 							continue;
@@ -1566,8 +1579,8 @@ static void _find_identifiers_in_base(const GDScriptCompletionIdentifier &p_base
 				List<StringName> enum_values;
 				ClassDB::get_enum_constants(type, type_enum, &enum_values);
 
-				if (p_base.type.class_type && base_type.kind == GDScriptParser::DataType::ENUM) {
-					const GDScriptParser::EnumNode *_enum = p_base.type.class_type->get_member(type_enum).m_enum;
+				if (base_type.class_type && base_type.kind == GDScriptParser::DataType::ENUM) {
+					const GDScriptParser::EnumNode *_enum = base_type.class_type->get_member(type_enum).m_enum;
 					for (const GDScriptParser::EnumNode::Value &enum_value : _enum->values) {
 						if (enum_value.doc_data.is_deprecated) {
 							deprecated_values.insert(enum_value.identifier->name);
