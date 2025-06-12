@@ -790,7 +790,7 @@
 			If [code]true[/code], results will include files located in the [code]addons[/code] folder.
 		</member>
 		<member name="filesystem/quick_open_dialog/instant_preview" type="bool" setter="" getter="">
-			If [code]true[/code], the dialog will stay open after selecting a resource. This allows changes to be previewed quickly.
+			If [code]true[/code], highlighting a resource will preview it quickly without confirming the selection or closing the dialog.
 		</member>
 		<member name="filesystem/quick_open_dialog/max_fuzzy_misses" type="int" setter="" getter="">
 			The number of allowed missed query characters in a match, if fuzzy matching is enabled. For example, with the default value of 2, [code]foobar[/code] would match [code]foobur[/code] and [code]foob[/code] but not [code]foo[/code].
