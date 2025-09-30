@@ -3619,6 +3619,14 @@ void CanvasItemEditor::_draw_selection() {
 		bool item_locked = ci->has_meta("_edit_lock_");
 		Transform2D xform = transform * ci->get_screen_transform();
 
+		Color border_color = Color(1, 0.6, 0.4, 0.7);
+
+		if (item_locked) {
+			border_color = Color(0.7, 0.7, 0.7, 0.7);
+		}
+
+		int border_width = Math::round(2 * EDSCALE);
+
 		// Draw the selected items position / surrounding boxes
 		if (ci->_edit_use_rect()) {
 			Rect2 rect = ci->_edit_get_rect();
@@ -3629,14 +3637,40 @@ void CanvasItemEditor::_draw_selection() {
 				xform.xform(rect.position + Vector2(0, rect.size.y))
 			};
 
-			Color c = Color(1, 0.6, 0.4, 0.7);
-
-			if (item_locked) {
-				c = Color(0.7, 0.7, 0.7, 0.7);
+			for (int i = 0; i < 4; i++) {
+				viewport->draw_line(endpoints[i], endpoints[(i + 1) % 4], border_color, border_width);
 			}
 
-			for (int i = 0; i < 4; i++) {
-				viewport->draw_line(endpoints[i], endpoints[(i + 1) % 4], c, Math::round(2 * EDSCALE));
+			// Draw margins for MarginContainer
+			MarginContainer *mc = Object::cast_to<MarginContainer>(ci);
+			if (mc) {
+				Rect2 rect = mc->_edit_get_rect();
+
+				Vector2 p1, p2;
+
+				// Calculate left margin line.
+				int margin_left = mc->get_theme_constant("margin_left");
+				p1 = xform.xform(rect.position + Vector2(margin_left, 0));
+				p2 = xform.xform(rect.position + Vector2(margin_left, rect.size.y));
+				viewport->draw_line(p1, p2, border_color, border_width);
+
+				// Calculate top margin line.
+				int margin_top = mc->get_theme_constant("margin_top");
+				p1 = xform.xform(rect.position + Vector2(0, margin_top));
+				p2 = xform.xform(rect.position + Vector2(rect.size.x, margin_top));
+				viewport->draw_line(p1, p2, border_color, border_width);
+
+				// Calculate right margin line.
+				int margin_right = mc->get_theme_constant("margin_right");
+				p1 = xform.xform(rect.position + Vector2(rect.size.x - margin_right, 0));
+				p2 = xform.xform(rect.position + Vector2(rect.size.x - margin_right, rect.size.y));
+				viewport->draw_line(p1, p2, border_color, border_width);
+
+				// Calculate bottom margin line.
+				int margin_bottom = mc->get_theme_constant("margin_bottom");
+				p1 = xform.xform(rect.position + Vector2(0, rect.size.y - margin_bottom));
+				p2 = xform.xform(rect.position + Vector2(rect.size.x, rect.size.y - margin_bottom));
+				viewport->draw_line(p1, p2, border_color, border_width);
 			}
 		} else {
 			Transform2D unscaled_transform = (xform * ci->get_transform().affine_inverse() * ci->_edit_get_transform()).orthonormalized();
@@ -4220,6 +4254,10 @@ void CanvasItemEditor::_notification(int p_what) {
 						se->prev_anchors[SIDE_RIGHT] = anchors[SIDE_RIGHT];
 						se->prev_anchors[SIDE_TOP] = anchors[SIDE_TOP];
 						se->prev_anchors[SIDE_BOTTOM] = anchors[SIDE_BOTTOM];
+						viewport->queue_redraw();
+					}
+
+					if (Object::cast_to<MarginContainer>(ci)) {
 						viewport->queue_redraw();
 					}
 				}
