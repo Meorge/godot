@@ -56,6 +56,7 @@ class ProjectListItemControl : public HBoxContainer {
 	Label *last_edited_info = nullptr;
 	Label *project_version = nullptr;
 	TextureRect *project_unsupported_features = nullptr;
+	TextureRect *project_different_version = nullptr;
 	HBoxContainer *tag_container = nullptr;
 	Button *touch_menu_button = nullptr;
 
@@ -67,6 +68,16 @@ class ProjectListItemControl : public HBoxContainer {
 	bool is_focus_hidden = false;
 	bool is_hovering = false;
 	bool is_favorite = false;
+
+	enum VersionMatchType {
+		VERSION_MATCH_TYPE_PROJECT_USES_SAME,
+		VERSION_MATCH_TYPE_PROJECT_USES_OLDER_MAJOR,
+		VERSION_MATCH_TYPE_PROJECT_USES_OLDER_MINOR,
+		VERSION_MATCH_TYPE_PROJECT_USES_NEWER_MAJOR,
+		VERSION_MATCH_TYPE_PROJECT_USES_NEWER_MINOR,
+	};
+
+	VersionMatchType version_match_type = VERSION_MATCH_TYPE_PROJECT_USES_SAME;
 
 	void _update_favorite_button_focus_color();
 	void _favorite_button_pressed();
