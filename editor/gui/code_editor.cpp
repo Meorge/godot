@@ -979,6 +979,11 @@ void CodeTextEditor::_text_editor_gui_input(const Ref<InputEvent> &p_event) {
 				accept_event();
 				return;
 			}
+			if (ED_IS_SHORTCUT("script_editor/code_actions", p_event)) {
+				text_editor->popup_code_actions(text_editor->get_caret_line());
+				accept_event();
+				return;
+			}
 		}
 	}
 }
@@ -1163,6 +1168,10 @@ void CodeTextEditor::update_editor_settings() {
 	text_editor->set_indent_size(EDITOR_GET("text_editor/behavior/indent/size"));
 	text_editor->set_auto_indent_enabled(EDITOR_GET("text_editor/behavior/indent/auto_indent"));
 	text_editor->set_indent_wrapped_lines(EDITOR_GET("text_editor/behavior/indent/indent_wrapped_lines"));
+
+	// Behavior: Code Actions
+	text_editor->set_show_code_actions(EDITOR_GET("text_editor/behavior/code_actions/show_code_actions"));
+	text_editor->set_code_action_button_location((CodeEdit::CodeActionButtonLocation)EDITOR_GET("text_editor/behavior/code_actions/button_location").operator int());
 
 	// Completion
 	text_editor->set_auto_brace_completion_enabled(EDITOR_GET("text_editor/completion/auto_brace_complete"));
@@ -1862,6 +1871,10 @@ void CodeTextEditor::remove_all_bookmarks() {
 	text_editor->clear_bookmarked_lines();
 }
 
+void CodeTextEditor::clear_code_actions() {
+	text_editor->clear_code_actions();
+}
+
 void CodeTextEditor::_zoom_in() {
 	int s = text_editor->get_theme_font_size(SceneStringName(font_size));
 	_zoom_to(zoom_factor * (s + MAX(1.0f, EDSCALE)) / s);
@@ -1940,6 +1953,7 @@ CodeTextEditor::CodeTextEditor() {
 	ED_SHORTCUT("script_editor/zoom_out", TTRC("Zoom Out"), KeyModifierMask::CMD_OR_CTRL | Key::MINUS);
 	ED_SHORTCUT_ARRAY("script_editor/reset_zoom", TTRC("Reset Zoom"),
 			{ int32_t(KeyModifierMask::CMD_OR_CTRL | Key::KEY_0), int32_t(KeyModifierMask::CMD_OR_CTRL | Key::KP_0) });
+	ED_SHORTCUT("script_editor/code_actions", TTRC("View Code Actions"), KeyModifierMask::ALT | Key::ENTER);
 
 	text_editor = memnew(CodeEdit);
 	add_child(text_editor);

@@ -60,6 +60,11 @@ public:
 		LOCATION_OTHER = 1 << 10,
 	};
 
+	enum CodeActionButtonLocation {
+		CODE_ACTION_BUTTON_LOCATION_OVERLAY_TEXT,
+		CODE_ACTION_BUTTON_LOCATION_OVER_LINE_NUMBER
+	};
+
 private:
 	/* Indent management */
 	int indent_size = 4;
@@ -270,6 +275,9 @@ private:
 		Color executing_line_color = Color(1, 1, 1);
 		Ref<Texture2D> executing_line_icon;
 
+		Color code_action_color = Color(1, 1, 1);
+		Ref<Texture2D> code_action_icon;
+
 		Color line_number_color = Color(1, 1, 1);
 
 		/* Code Completion */
@@ -317,6 +325,15 @@ private:
 	void _text_changed();
 
 	void _apply_project_settings();
+
+	bool show_code_actions = true;
+	bool code_action_button_hovered = false;
+	PopupMenu *code_action_popup = nullptr;
+	void _on_code_action_id_pressed(int p_id);
+	CodeEdit::CodeActionButtonLocation code_action_button_location = CODE_ACTION_BUTTON_LOCATION_OVERLAY_TEXT;
+
+	Vector<ScriptLanguage::CodeActionAndDiagnostics> code_actions;
+	Vector<ScriptLanguage::CodeActionAndDiagnostics> current_code_actions;
 
 protected:
 	void _notification(int p_what);
@@ -385,6 +402,18 @@ public:
 	bool has_auto_brace_completion_close_key(const String &p_close_key) const;
 
 	String get_auto_brace_completion_close_key(const String &p_open_key) const;
+
+	/* Code Actions */
+	void apply_document_edits(const ScriptLanguage::DocumentEditOperation &p_doc_edits);
+	void apply_text_edit(const ScriptLanguage::TextEditOperation &p_edit);
+	void clear_code_actions();
+	void set_code_actions(const Vector<ScriptLanguage::CodeActionAndDiagnostics> &p_actions);
+	Vector<ScriptLanguage::CodeActionAndDiagnostics> get_code_actions_for_line(int p_line) const;
+	void popup_code_actions(int p_line);
+	void set_show_code_actions(bool p_show) { show_code_actions = p_show; }
+	Rect2 _get_code_action_button_inline_rect();
+	void _draw_code_action_button(RID p_canvas_item, const Rect2 &p_icon_rect);
+	void set_code_action_button_location(CodeEdit::CodeActionButtonLocation p_location) { code_action_button_location = p_location; }
 
 	/* Main Gutter */
 	void set_draw_breakpoints_gutter(bool p_draw);

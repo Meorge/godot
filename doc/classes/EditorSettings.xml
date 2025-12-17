@@ -1460,6 +1460,15 @@
 		<member name="text_editor/appearance/whitespace/line_spacing" type="int" setter="" getter="">
 			The space to add between lines (in pixels). Greater line spacing can help improve readability at the cost of displaying fewer lines on screen. Negative values allow for even more compact text, but may look broken with certain fonts.
 		</member>
+		<member name="text_editor/behavior/code_actions/button_location" type="int" setter="" getter="">
+			Where to display the code actions lightbulb button, if there are code actions available for the current line.
+			- [b]Near Text:[/b] The button is displayed near the current line if code actions are available. If there is not space on the current line, the button is displayed above or below.
+			- [b]Over Line Number:[/b] The button is displayed instead of the current line number in the gutter if code actions are available. Note that if this option is enabled and a code action is available for the current line, then the current line's number cannot be clicked to select the entire line.
+		</member>
+		<member name="text_editor/behavior/code_actions/show_code_actions" type="bool" setter="" getter="">
+			If [code]true[/code], displays a lightbulb button when the cursor is on a line with code actions available.
+			Code actions can perform automated edits to code that address warnings or fix errors.
+		</member>
 		<member name="text_editor/behavior/documentation/enable_tooltips" type="bool" setter="" getter="">
 			If [code]true[/code], documentation tooltips will appear when hovering over a symbol.
 		</member>
@@ -1659,6 +1668,9 @@
 		</member>
 		<member name="text_editor/theme/highlighting/caret_color" type="Color" setter="" getter="">
 			The script editor's caret color.
+		</member>
+		<member name="text_editor/theme/highlighting/code_action_color" type="Color" setter="" getter="">
+			The script editor's color for the lightbulb icon indicating a Code Action is available for a given line.
 		</member>
 		<member name="text_editor/theme/highlighting/code_folding_color" type="Color" setter="" getter="">
 			The script editor's color for the code folding icon (displayed in the gutter).

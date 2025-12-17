@@ -43,6 +43,7 @@
 #include "core/string/ustring.h"
 #include "scene/theme/theme_db.h"
 #include "servers/display/accessibility_server.h"
+#include "servers/display/display_server.h"
 #include "servers/rendering/rendering_server.h"
 
 void CodeEdit::_apply_project_settings() {
@@ -425,6 +426,11 @@ void CodeEdit::_notification(int p_what) {
 						RS::get_singleton()->canvas_item_add_rect(ci, Rect2(code_completion_rect.position.x + code_completion_rect.size.width, code_completion_rect.position.y + o * code_completion_rect.size.y, scroll_width, code_completion_rect.size.y * r), scroll_color);
 					}
 				}
+
+				/* Code action button */
+				if (code_action_button_location == CODE_ACTION_BUTTON_LOCATION_OVERLAY_TEXT && show_code_actions && get_code_actions_for_line(get_caret_line()).size() > 0) {
+					_draw_code_action_button(ci, _get_code_action_button_inline_rect());
+				}
 			}
 		} break;
 
@@ -435,6 +441,63 @@ void CodeEdit::_notification(int p_what) {
 		case NOTIFICATION_MOUSE_EXIT: {
 			symbol_tooltip_timer->stop();
 		} break;
+	}
+}
+
+Rect2 CodeEdit::_get_code_action_button_inline_rect() {
+	const int row_height = get_line_height();
+	Size2 icon_size(row_height, row_height);
+
+	Point2 icon_position = get_caret_draw_pos();
+	icon_position.x = get_total_gutter_width() + (row_height / 2.0);
+	icon_position.y = icon_position.y - (row_height / 2.0) - (icon_size.y / 2.0);
+
+	const int line = get_caret_line();
+	const int indent_level = get_indent_level(line);
+
+	// If the current line doesn't have indentation, then the button will cover
+	// the beginning of the line, so we need to find a better place for it.
+	if (get_line_width(line) > 0 && indent_level < 4) {
+		// Check if line above has space.
+		if (line >= 1 && (get_indent_level(line - 1) >= 4 || get_line_width(line - 1) == 0)) {
+			icon_position.y -= row_height;
+		}
+
+		// Check if line below has space.
+		else if (line < get_line_count() - 1 && (get_indent_level(line + 1) >= 4 || get_line_width(line + 1) == 0)) {
+			icon_position.y += row_height;
+		}
+
+		// If it's the last line of the file, then there will be space
+		// underneath it.
+		else if (line == get_line_count() - 1) {
+			icon_position.y += row_height;
+		}
+	}
+
+	icon_position = icon_position.round();
+
+	Rect2 icon_rect(icon_position, icon_size);
+	return icon_rect;
+}
+
+void CodeEdit::_draw_code_action_button(RID p_canvas_item, const Rect2 &p_icon_rect) {
+	if (theme_cache.code_action_icon.is_valid()) {
+		Color use_color = theme_cache.code_action_color;
+		if (code_action_button_hovered) {
+			use_color = use_color.lightened(0.5);
+		}
+		theme_cache.code_action_icon->draw_rect(p_canvas_item, p_icon_rect, false, use_color);
+
+		// Dropdown indicator
+		if (theme_cache.can_fold_icon.is_valid()) {
+			Rect2 dropdown_arrow_rect = p_icon_rect;
+			dropdown_arrow_rect.size *= 0.5;
+			dropdown_arrow_rect.position.x = p_icon_rect.position.x + p_icon_rect.size.x * 0.6;
+			dropdown_arrow_rect.position.y = p_icon_rect.position.y + (p_icon_rect.size.y * 0.75) - (dropdown_arrow_rect.size.y / 2.0);
+
+			theme_cache.can_fold_icon->draw_rect(p_canvas_item, dropdown_arrow_rect, false, get_font_color());
+		}
 	}
 }
 
@@ -578,6 +641,16 @@ void CodeEdit::gui_input(const Ref<InputEvent> &p_gui_input) {
 
 		if (mb->is_pressed()) {
 			Vector2i mpos = mb->get_position();
+
+			if (code_action_button_location == CODE_ACTION_BUTTON_LOCATION_OVERLAY_TEXT && show_code_actions && _get_code_action_button_inline_rect().has_point(mpos)) {
+				if (code_action_popup->is_visible()) {
+					code_action_popup->hide();
+				} else {
+					popup_code_actions(get_caret_line());
+				}
+				return;
+			}
+
 			if (is_layout_rtl()) {
 				mpos.x = get_size().x - mpos.x;
 			}
@@ -648,6 +721,13 @@ void CodeEdit::gui_input(const Ref<InputEvent> &p_gui_input) {
 		bool scroll_hovered = code_completion_scroll_rect.has_point(mpos);
 		if (is_code_completion_scroll_hovered != scroll_hovered) {
 			is_code_completion_scroll_hovered = scroll_hovered;
+			accept_event();
+			queue_redraw();
+		}
+
+		bool code_action_now_hovered = _get_code_action_button_inline_rect().has_point(get_local_mouse_pos());
+		if (code_action_button_hovered != code_action_now_hovered) {
+			code_action_button_hovered = code_action_now_hovered;
 			accept_event();
 			queue_redraw();
 		}
@@ -1491,6 +1571,32 @@ String CodeEdit::get_auto_brace_completion_close_key(const String &p_open_key) c
 	return String();
 }
 
+/* Code Actions */
+void CodeEdit::apply_document_edits(const ScriptLanguage::DocumentEditOperation &p_doc_edits) {
+	for (int i = p_doc_edits.edits.size() - 1; i >= 0; i--) {
+		apply_text_edit(p_doc_edits.edits[i]);
+	}
+}
+
+void CodeEdit::apply_text_edit(const ScriptLanguage::TextEditOperation &p_edit) {
+	begin_complex_operation();
+	select(p_edit.start_line - 1, p_edit.start_col - 1, p_edit.end_line - 1, p_edit.end_col - 1);
+	insert_text_at_caret(p_edit.new_text);
+	end_complex_operation();
+}
+
+void CodeEdit::set_code_actions(const Vector<ScriptLanguage::CodeActionAndDiagnostics> &p_actions) {
+	code_actions = p_actions;
+}
+
+void CodeEdit::clear_code_actions() {
+	code_actions.clear();
+}
+
+void CodeEdit::_on_code_action_id_pressed(int p_id) {
+	emit_signal(SNAME("document_edits_requested"), current_code_actions[p_id].code_action.to_dict()["document_edits"]);
+}
+
 /* Main Gutter */
 void CodeEdit::_update_draw_main_gutter() {
 	set_gutter_draw(main_gutter, draw_breakpoints || draw_bookmarks || draw_executing_lines);
@@ -1670,6 +1776,46 @@ PackedInt32Array CodeEdit::get_executing_lines() const {
 	return ret;
 }
 
+/* Code Actions */
+Vector<ScriptLanguage::CodeActionAndDiagnostics> CodeEdit::get_code_actions_for_line(int p_line) const {
+	Vector<ScriptLanguage::CodeActionAndDiagnostics> actions_this_line;
+	for (const ScriptLanguage::CodeActionAndDiagnostics &action : code_actions) {
+		for (const ScriptLanguage::Warning &w : action.related_warnings) {
+			if (p_line >= w.start_line - 1 && p_line <= w.end_line - 1) {
+				actions_this_line.append(action);
+				break;
+			}
+		}
+
+		for (const ScriptLanguage::ScriptError &e : action.related_errors) {
+			if (p_line == e.line - 1) {
+				actions_this_line.append(action);
+				break;
+			}
+		}
+	}
+	return actions_this_line;
+}
+
+void CodeEdit::popup_code_actions(int p_line) {
+	code_action_popup->clear();
+
+	Vector<ScriptLanguage::CodeActionAndDiagnostics> actions_this_line = get_code_actions_for_line(p_line);
+	code_action_popup->add_separator(ETR("Quick Fix"), -2);
+	int action_index = 0;
+	for (const ScriptLanguage::CodeActionAndDiagnostics &action : actions_this_line) {
+		code_action_popup->add_item(action.code_action.description, action_index);
+		action_index++;
+	}
+
+	if (action_index == 0) {
+		return;
+	}
+
+	current_code_actions = actions_this_line;
+	code_action_popup->popup(Rect2i(DisplayServer::get_singleton()->mouse_get_position(), Size2i()));
+}
+
 /* Line numbers */
 void CodeEdit::set_draw_line_numbers(bool p_draw) {
 	set_gutter_draw(line_number_gutter, p_draw);
@@ -1753,7 +1899,15 @@ void CodeEdit::_line_number_draw_callback(int p_line, int p_gutter, const Rect2 
 		number_color = theme_cache.line_number_color;
 	}
 
-	TS->shaped_text_draw(text_rid, get_text_canvas_item(), ofs, -1, -1, number_color);
+	if (code_action_button_location == CODE_ACTION_BUTTON_LOCATION_OVER_LINE_NUMBER && show_code_actions && p_line == get_caret_line() && get_code_actions_for_line(p_line).size() > 0) {
+		// Draw code action icon
+		Rect2 code_action_icon_rect = p_region;
+		code_action_icon_rect.position.x = p_region.position.x + p_region.size.x - p_region.size.y;
+		code_action_icon_rect.size.x = p_region.size.y;
+		_draw_code_action_button(get_text_canvas_item(), code_action_icon_rect);
+	} else {
+		TS->shaped_text_draw(text_rid, get_text_canvas_item(), ofs, -1, -1, number_color);
+	}
 }
 
 void CodeEdit::_clear_line_number_text_cache() {
@@ -3221,6 +3375,9 @@ void CodeEdit::_bind_methods() {
 	/* Code Completion */
 	ADD_SIGNAL(MethodInfo("code_completion_requested"));
 
+	/* Code actions */
+	ADD_SIGNAL(MethodInfo("document_edits_requested", PropertyInfo(Variant::DICTIONARY, "edits")));
+
 	/* Symbol lookup */
 	ADD_SIGNAL(MethodInfo("symbol_lookup", PropertyInfo(Variant::STRING, "symbol"), PropertyInfo(Variant::INT, "line"), PropertyInfo(Variant::INT, "column")));
 	ADD_SIGNAL(MethodInfo("symbol_validate", PropertyInfo(Variant::STRING, "symbol")));
@@ -3247,6 +3404,9 @@ void CodeEdit::_bind_methods() {
 
 	BIND_THEME_ITEM(Theme::DATA_TYPE_COLOR, CodeEdit, executing_line_color);
 	BIND_THEME_ITEM_CUSTOM(Theme::DATA_TYPE_ICON, CodeEdit, executing_line_icon, "executing_line");
+
+	BIND_THEME_ITEM(Theme::DATA_TYPE_COLOR, CodeEdit, code_action_color);
+	BIND_THEME_ITEM_CUSTOM(Theme::DATA_TYPE_ICON, CodeEdit, code_action_icon, "code_action");
 
 	BIND_THEME_ITEM(Theme::DATA_TYPE_COLOR, CodeEdit, line_number_color);
 
@@ -3347,14 +3507,23 @@ void CodeEdit::_gutter_clicked(int p_line, int p_gutter) {
 	}
 
 	if (p_gutter == line_number_gutter) {
-		remove_secondary_carets();
-		set_selection_mode(TextEdit::SelectionMode::SELECTION_MODE_LINE);
-		if (p_line == get_line_count() - 1) {
-			select(p_line, 0, p_line, INT_MAX);
+		if (code_action_button_location == CODE_ACTION_BUTTON_LOCATION_OVER_LINE_NUMBER && show_code_actions && p_line == get_caret_line() && get_code_actions_for_line(p_line).size() > 0) {
+			if (code_action_popup->is_visible()) {
+				code_action_popup->hide();
+			} else {
+				popup_code_actions(p_line);
+			}
+			return;
 		} else {
-			select(p_line, 0, p_line + 1, 0);
+			remove_secondary_carets();
+			set_selection_mode(TextEdit::SelectionMode::SELECTION_MODE_LINE);
+			if (p_line == get_line_count() - 1) {
+				select(p_line, 0, p_line, INT_MAX);
+			} else {
+				select(p_line, 0, p_line + 1, 0);
+			}
+			return;
 		}
-		return;
 	}
 
 	if (p_gutter == fold_gutter) {
@@ -4190,6 +4359,11 @@ CodeEdit::CodeEdit() {
 	connect("gutter_added", callable_mp(this, &CodeEdit::_update_gutter_indexes));
 	connect("gutter_removed", callable_mp(this, &CodeEdit::_update_gutter_indexes));
 	_update_gutter_indexes();
+
+	// Popup for Code Actions
+	code_action_popup = memnew(PopupMenu);
+	code_action_popup->connect(SceneStringName(id_pressed), callable_mp(this, &CodeEdit::_on_code_action_id_pressed));
+	add_child(code_action_popup);
 }
 
 CodeEdit::~CodeEdit() {
