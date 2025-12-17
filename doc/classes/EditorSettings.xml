@@ -1463,6 +1463,10 @@
 		<member name="text_editor/appearance/whitespace/line_spacing" type="int" setter="" getter="">
 			The space to add between lines (in pixels). Greater line spacing can help improve readability at the cost of displaying fewer lines on screen. Negative values allow for even more compact text, but may look broken with certain fonts.
 		</member>
+		<member name="text_editor/behavior/code_actions/show_code_actions" type="bool" setter="" getter="">
+			If [code]true[/code], displays a lightbulb button when the cursor is on a line with code actions available.
+			Code actions can perform automated edits to code that address warnings or fix errors.
+		</member>
 		<member name="text_editor/behavior/documentation/enable_tooltips" type="bool" setter="" getter="">
 			If [code]true[/code], documentation tooltips will appear when hovering over a symbol.
 		</member>
