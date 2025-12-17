@@ -161,6 +161,8 @@ protected:
 
 	void _on_caret_moved();
 
+	void _on_code_action_apply_requested(const Dictionary &p_action);
+
 	void _update_warnings();
 	void _update_errors();
 

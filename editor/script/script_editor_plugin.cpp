@@ -2326,6 +2326,7 @@ bool ScriptEditor::edit(const Ref<Resource> &p_resource, int p_line, int p_col, 
 			cte->set_zoom_factor(zoom_factor);
 			cte->connect("zoomed", callable_mp(this, &ScriptEditor::_set_script_zoom_factor));
 			cte->connect(SceneStringName(visibility_changed), callable_mp(this, &ScriptEditor::_update_code_editor_zoom_factor).bind(cte));
+			cte->get_text_editor()->connect("document_edits_requested", callable_mp(this, &ScriptEditor::_on_document_edits_requested2));
 		}
 	}
 
@@ -2346,6 +2347,13 @@ bool ScriptEditor::edit(const Ref<Resource> &p_resource, int p_line, int p_col, 
 
 	notify_script_changed(p_resource);
 	return true;
+}
+
+void ScriptEditor::_on_document_edits_applied(const PackedStringArray &p_paths) {
+	// Currently does the same thing as _on_find_in_files_modified_files.
+	print_line("Document edits were applied to files:", p_paths);
+	_test_script_times_on_disk();
+	_update_modified_scripts_for_external_editor();
 }
 
 PackedStringArray ScriptEditor::get_unsaved_scripts() const {
@@ -3727,6 +3735,165 @@ void ScriptEditor::_filter_scripts_text_changed(const String &p_newtext) {
 
 void ScriptEditor::_filter_methods_text_changed(const String &p_newtext) {
 	_update_members_overview();
+}
+
+void ScriptEditor::_on_document_edits_requested2(const Array &p_doc_edits) {
+	// Get all of the files that need to be opened.
+	// If a file isn't currently opened, then open it and add it to a list.
+	HashMap<String, TextEditorBase *> files_and_editors;
+	Vector<String> files_to_open_editor_for;
+	for (const Variant &d : p_doc_edits) {
+		ScriptLanguage::DocumentEditOperation doc_edit = ScriptLanguage::DocumentEditOperation::from_dict(d);
+		String file_path = doc_edit.file_path;
+
+		// Look to see if this file already has an editor open.
+		bool editor_found = false;
+		for (Variant editor : _get_open_script_editors()) {
+			TextEditorBase *te = Object::cast_to<TextEditorBase>(editor);
+			if (te && file_path == te->edited_file_data.path) {
+				files_and_editors.insert(file_path, te);
+				editor_found = true;
+				break;
+			}
+		}
+
+		// This file doesn't currently have an editor; thus, we need to open the
+		// file and then get its editor.
+		if (!editor_found) {
+			open_file(file_path);
+
+			// Now that the file has been opened (or at least we tried to open it),
+			// try finding its editor again!
+			// (This could probably be simplified if we kept a HashMap of files and
+			// their corresponding editors, for all open files.)
+			for (Variant editor : _get_open_script_editors()) {
+				TextEditorBase *te = Object::cast_to<TextEditorBase>(editor);
+				if (te && file_path == te->edited_file_data.path) {
+					files_and_editors.insert(file_path, te);
+					editor_found = true;
+					break;
+				}
+			}
+
+			// Not using an error macro so that the rest of the function continues
+			// (if other files have editors open, the document edits can still be
+			// performed on them).
+			if (!editor_found) {
+				print_error(vformat("Even after attempting to open \"%s\", an editor for it could not be found. The requested document edits may still be performed but will not include edits to this file.", file_path));
+			}
+		}
+	}
+
+	for (const Variant &d : p_doc_edits) {
+		ScriptLanguage::DocumentEditOperation doc_edit = ScriptLanguage::DocumentEditOperation::from_dict(d);
+		CodeEdit *ce = files_and_editors[doc_edit.file_path]->get_code_editor()->get_text_editor();
+		ce->begin_complex_operation();
+		for (const ScriptLanguage::TextEditOperation &text_edit : doc_edit.edits) {
+			ce->select(text_edit.start_line - 1, text_edit.start_col - 1, text_edit.end_line - 1, text_edit.end_col - 1);
+			ce->insert_text_at_caret(text_edit.new_text);
+		}
+		ce->end_complex_operation();
+	}
+}
+
+void ScriptEditor::_on_document_edits_requested(const Dictionary &p_action) {
+	print_line("code action apply requested! here's the data:", p_action);
+
+	ERR_FAIL_COND_MSG(!p_action.has("document_edits"), "The requested Code Action has no document edits.");
+	ERR_FAIL_COND_MSG(!p_action["document_edits"].is_array(), "The requested Code Action's document edits are not an array.");
+
+	HashSet<String> documents_edited;
+
+	Array document_edits = Array(p_action["document_edits"]);
+	for (const Variant &doc_edit : document_edits) {
+		ERR_FAIL_COND_MSG(doc_edit.get_type() != Variant::Type::DICTIONARY, "A document edit operation isn't a Dictionary.");
+		Dictionary de_dict = Dictionary(doc_edit);
+
+		ERR_FAIL_COND_MSG(!de_dict.has("file_path"), "A document edit operation does not provide a file path.");
+		ERR_FAIL_COND_MSG(!de_dict["file_path"].is_string(), "A document edit operation's \"file_path\" key does not correspond to a String.");
+		String file_path = de_dict["file_path"];
+		documents_edited.insert(file_path);
+
+		_apply_document_edits(de_dict);
+	}
+
+	// We move the file paths from the HashSet to the PackedStringArray
+	// to avoid duplicate file paths. Don't think it would necessarily be a
+	// terrible thing, but better safe than sorry, I suppose?
+	PackedStringArray file_paths;
+	for (const String &p : documents_edited) {
+		file_paths.append(p);
+	}
+	// Emit a signal that these files were modified to indicate
+	// as such so other things can update (see find_in_files.cpp).
+	_on_document_edits_applied(file_paths);
+}
+
+void ScriptEditor::_apply_document_edits(const Dictionary &p_doc_edit) {
+	ERR_FAIL_COND_MSG(!p_doc_edit.has("file_path"), "A document edit operation does not provide a file path.");
+	ERR_FAIL_COND_MSG(!p_doc_edit["file_path"].is_string(), "A document edit operation's \"file_path\" key does not correspond to a String.");
+	String file_path = p_doc_edit["file_path"];
+
+	ERR_FAIL_COND_MSG(!p_doc_edit.has("edits"), "A document edit operation does not provide an Array of edits.");
+	ERR_FAIL_COND_MSG(!p_doc_edit["edits"].is_array(), "A document edit operation's \"edits\" key does not correspond to an Array.");
+	Array edits = p_doc_edit["edits"];
+
+	Ref<FileAccess> f = FileAccess::open(file_path, FileAccess::READ);
+	ERR_FAIL_COND_MSG(f.is_null(), "Cannot open file from path '" + file_path + "'.");
+	String buffer = f->get_as_text();
+	Vector<String> lines = buffer.split("\n");
+
+	// Keep track of the position through the overall string that each line starts at.
+	Vector<int> start_of_line_positions;
+
+	// The first line starts at position 0.
+	start_of_line_positions.append(0);
+
+	// TODO: Count a tab character as the number of specified columns.
+	for (int i = 1; i < lines.size(); i++) {
+		start_of_line_positions.append(start_of_line_positions[i - 1] + lines[i - 1].length() + 1);
+	}
+
+	// Iterate through the edits in reverse, since edits earlier in the
+	// document will change positions of edits later in the document.
+	// TODO: Sort the edits so they're in order.
+	// TODO: Ensure that no edits' ranges overlap.
+	for (int i = edits.size() - 1; i >= 0; i--) {
+		ERR_FAIL_COND_MSG(edits[i].get_type() != Variant::DICTIONARY, "An edit operation provided as part of a document edit operation is not a Dictionary.");
+		Dictionary edit = edits[i];
+
+		ERR_FAIL_COND_MSG(!edit.has("start_line"), "A requested edit operation does not specify a start line.");
+		ERR_FAIL_COND_MSG(edit["start_line"].get_type() != Variant::INT, "The start line for a requested edit operation is not an integer.");
+		int start_line = edit["start_line"];
+
+		ERR_FAIL_COND_MSG(!edit.has("start_col"), "A requested edit operation does not specify a start column.");
+		ERR_FAIL_COND_MSG(edit["start_col"].get_type() != Variant::INT, "The start column for a requested edit operation is not an integer.");
+		int start_col = edit["start_col"];
+
+		ERR_FAIL_COND_MSG(!edit.has("end_line"), "A requested edit operation does not specify an end line.");
+		ERR_FAIL_COND_MSG(edit["end_line"].get_type() != Variant::INT, "The end line for a requested edit operation is not an integer.");
+		int end_line = edit["end_line"];
+
+		ERR_FAIL_COND_MSG(!edit.has("end_col"), "A requested edit operation does not specify an end column.");
+		ERR_FAIL_COND_MSG(edit["end_col"].get_type() != Variant::INT, "The end column for a requested edit operation is not an integer.");
+		int end_col = edit["end_col"];
+
+		ERR_FAIL_COND_MSG(!edit.has("new_text"), "A requested edit operation does not specify new text.");
+		ERR_FAIL_COND_MSG(edit["new_text"].get_type() != Variant::STRING, "The new text for a requested edit operation is not a String.");
+		String new_text = edit["new_text"];
+
+		// TODO: Count a tab character as the number of specified columns.
+		String before = buffer.substr(0, start_of_line_positions[start_line - 1] + (start_col - 1));
+		String after = buffer.substr(start_of_line_positions[end_line - 1] + (end_col - 1));
+		buffer = before + new_text + after;
+	}
+
+	// With all of the edits applied to this document's buffer, we can write
+	// the buffer back to the document.
+	Error err = f->reopen(file_path, FileAccess::WRITE);
+	ERR_FAIL_COND_MSG(err != OK, "Cannot create file in path '" + file_path + "'.");
+
+	f->store_string(buffer);
 }
 
 void ScriptEditor::_bind_methods() {

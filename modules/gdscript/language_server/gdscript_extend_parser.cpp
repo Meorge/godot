@@ -129,6 +129,8 @@ GodotRange GodotRange::from_lsp(const LSP::Range &p_range, const Vector<String> 
 void ExtendGDScriptParser::update_diagnostics() {
 	diagnostics.clear();
 
+	actions.clear();
+
 	const List<ParserError> &parser_errors = get_errors();
 	for (const ParserError &error : parser_errors) {
 		LSP::Diagnostic diagnostic;
@@ -142,6 +144,30 @@ void ExtendGDScriptParser::update_diagnostics() {
 
 		diagnostic.range = godot_range.to_lsp(get_lines());
 		diagnostics.push_back(diagnostic);
+
+		for (const ScriptLanguage::CodeActionOperation &op : error.code_actions.actions) {
+			LSP::WorkspaceEdit workspace_edit;
+			for (const ScriptLanguage::DocumentEditOperation &doc_edit : op.document_edits) {
+				for (const ScriptLanguage::TextEditOperation &edit : doc_edit.edits) {
+					LSP::TextEdit text_edit;
+
+					text_edit.range.start.line = LINE_NUMBER_TO_INDEX(edit.start_line);
+					text_edit.range.start.character = edit.start_col - 1;
+
+					text_edit.range.end.line = LINE_NUMBER_TO_INDEX(edit.end_line);
+					text_edit.range.end.character = edit.end_col - 1;
+
+					text_edit.newText = edit.new_text;
+					workspace_edit.add_edit(GDScriptLanguageProtocol::get_singleton()->get_workspace()->get_file_uri(doc_edit.file_path), text_edit);
+				}
+			}
+
+			LSP::CodeAction action;
+			action.diagnostics.append(diagnostic);
+			action.edit = workspace_edit;
+			action.title = op.description;
+			actions.push_back(action);
+		}
 	}
 
 	const List<GDScriptWarning> &parser_warnings = get_warnings();
@@ -157,6 +183,30 @@ void ExtendGDScriptParser::update_diagnostics() {
 
 		diagnostic.range = godot_range.to_lsp(get_lines());
 		diagnostics.push_back(diagnostic);
+
+		for (const ScriptLanguage::CodeActionOperation &op : warning.code_actions.actions) {
+			LSP::WorkspaceEdit workspace_edit;
+			for (const ScriptLanguage::DocumentEditOperation &doc_edit : op.document_edits) {
+				for (const ScriptLanguage::TextEditOperation &edit : doc_edit.edits) {
+					LSP::TextEdit text_edit;
+
+					text_edit.range.start.line = LINE_NUMBER_TO_INDEX(edit.start_line);
+					text_edit.range.start.character = edit.start_col - 1;
+
+					text_edit.range.end.line = LINE_NUMBER_TO_INDEX(edit.end_line);
+					text_edit.range.end.character = edit.end_col - 1;
+
+					text_edit.newText = edit.new_text;
+					workspace_edit.add_edit(GDScriptLanguageProtocol::get_singleton()->get_workspace()->get_file_uri(doc_edit.file_path), text_edit);
+				}
+			}
+
+			LSP::CodeAction action;
+			action.diagnostics.append(diagnostic);
+			action.edit = workspace_edit;
+			action.title = op.description;
+			actions.push_back(action);
+		}
 	}
 }
 
