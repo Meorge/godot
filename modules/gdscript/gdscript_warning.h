@@ -170,7 +170,6 @@ public:
 	static String get_name_from_code(Code p_code);
 	static String get_setting_path_from_code(Code p_code);
 	static Code get_code_from_name(const String &p_name);
-	static ScriptLanguage::CodeActionOperation get_ignore_code_action_from_code(int p_line, Code p_code);
 };
 
 #endif // DEBUG_ENABLED

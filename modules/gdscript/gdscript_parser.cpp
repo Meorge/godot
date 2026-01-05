@@ -260,7 +260,31 @@ void GDScriptParser::push_warning(const Node *p_source, GDScriptWarning::Code p_
 	ScriptLanguage::CodeActionGroup action_group;
 	action_group.title = GDScriptWarning::get_name_from_code(p_code);
 	action_group.actions.append_array(p_code_actions);
-	action_group.actions.append(GDScriptWarning::get_ignore_code_action_from_code(p_source->start_line, p_code));
+
+#ifdef TOOLS_ENABLED
+	// Create the ignore code action.
+	ScriptLanguage::CodeActionOperation ignore_action;
+	ScriptLanguage::TextEditOperation ignore_op;
+	ignore_op.start_line = p_source->start_line;
+	ignore_op.end_line = p_source->start_line;
+
+	int col = 0;
+	if (p_source->suite_node) {
+		col = p_source->suite_node->start_column;
+	}
+
+	ignore_op.start_col = col;
+	ignore_op.end_col = col;
+
+	String warning_name = GDScriptWarning::get_name_from_code(p_code);
+	ignore_op.new_text = vformat("@warning_ignore(\"%s\")\n", warning_name.to_lower());
+	for (int i = 0; i < col - 1; i++) {
+		ignore_op.new_text += " ";
+	}
+	ignore_action.description = vformat("Ignore \"%s\"", warning_name);
+	ignore_action.edits.append(ignore_op);
+	action_group.actions.append(ignore_action);
+#endif // TOOLS_ENABLED
 
 	PendingWarning pw;
 	pw.source = p_source;
@@ -5613,6 +5637,10 @@ void GDScriptParser::reset_extents(Node *p_node, GDScriptTokenizer::Token p_toke
 	p_node->end_line = p_token.end_line;
 	p_node->start_column = p_token.start_column;
 	p_node->end_column = p_token.end_column;
+
+#ifdef TOOLS_ENABLED
+	p_node->suite_node = current_suite;
+#endif // TOOLS_ENABLED
 }
 
 void GDScriptParser::reset_extents(Node *p_node, Node *p_from) {
@@ -5623,6 +5651,10 @@ void GDScriptParser::reset_extents(Node *p_node, Node *p_from) {
 	p_node->end_line = p_from->end_line;
 	p_node->start_column = p_from->start_column;
 	p_node->end_column = p_from->end_column;
+
+#ifdef TOOLS_ENABLED
+	p_node->suite_node = current_suite;
+#endif // TOOLS_ENABLED
 }
 
 /*---------- PRETTY PRINT FOR DEBUG ----------*/

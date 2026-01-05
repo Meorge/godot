@@ -343,6 +343,10 @@ public:
 		Node *next = nullptr;
 		List<AnnotationNode *> annotations;
 
+#ifdef TOOLS_ENABLED
+		SuiteNode *suite_node = nullptr;
+#endif // TOOLS_ENABLED
+
 		DataType datatype;
 
 		virtual DataType get_datatype() const { return datatype; }
