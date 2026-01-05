@@ -269,8 +269,21 @@ void GDScriptParser::push_warning(const Node *p_source, GDScriptWarning::Code p_
 	ignore_op.end_line = p_source->start_line;
 
 	int col = 0;
-	if (p_source->suite_node) {
-		col = p_source->suite_node->start_column;
+
+	// Traverse up the ancestry tree until we either:
+	// - Find a node where the parent is a suite, in which case we use the PARENT SUITE's column.
+	// - Find a node where the parent is a class, in which case we use the CHILD NODE's column.
+	const Node *curr = p_source;
+	while (curr != nullptr && curr->parent != nullptr) {
+		if (curr->parent->type == Node::Type::SUITE) {
+			col = curr->parent->start_column;
+			break;
+		}
+		if (curr->parent->type == Node::Type::CLASS) {
+			col = curr->start_column; // TODO: figure out this logic better, esp for static??
+			break;
+		}
+		curr = curr->parent;
 	}
 
 	ignore_op.start_col = col;
@@ -537,6 +550,10 @@ Error GDScriptParser::parse(const String &p_source_code, const String &p_script_
 		ERR_PRINT("Parser bug: Imbalanced multiline stack.");
 	}
 #endif // DEBUG_ENABLED
+
+	// GDScriptParser::TreePrinter p;
+	// p.print_tree(*this);
+	// print_line("-----------");
 
 	if (errors.is_empty()) {
 		return OK;
@@ -5637,10 +5654,6 @@ void GDScriptParser::reset_extents(Node *p_node, GDScriptTokenizer::Token p_toke
 	p_node->end_line = p_token.end_line;
 	p_node->start_column = p_token.start_column;
 	p_node->end_column = p_token.end_column;
-
-#ifdef TOOLS_ENABLED
-	p_node->suite_node = current_suite;
-#endif // TOOLS_ENABLED
 }
 
 void GDScriptParser::reset_extents(Node *p_node, Node *p_from) {
@@ -5651,10 +5664,6 @@ void GDScriptParser::reset_extents(Node *p_node, Node *p_from) {
 	p_node->end_line = p_from->end_line;
 	p_node->start_column = p_from->start_column;
 	p_node->end_column = p_from->end_column;
-
-#ifdef TOOLS_ENABLED
-	p_node->suite_node = current_suite;
-#endif // TOOLS_ENABLED
 }
 
 /*---------- PRETTY PRINT FOR DEBUG ----------*/
@@ -5922,23 +5931,60 @@ void GDScriptParser::TreePrinter::print_class(ClassNode *p_class) {
 	for (int i = 0; i < p_class->members.size(); i++) {
 		const ClassNode::Member &m = p_class->members[i];
 
+		Node *bla;
 		switch (m.type) {
 			case ClassNode::Member::CLASS:
+				bla = m.m_class->parent;
+				while (bla != nullptr) {
+					push_text(vformat("%s->", bla->get_type_name()));
+					bla = bla->parent;
+				}
+				push_text("ROOT ");
 				print_class(m.m_class);
 				break;
 			case ClassNode::Member::VARIABLE:
+				bla = m.variable->parent;
+				while (bla != nullptr) {
+					push_text(vformat("%s->", bla->get_type_name()));
+					bla = bla->parent;
+				}
+				push_text("ROOT ");
 				print_variable(m.variable);
 				break;
 			case ClassNode::Member::CONSTANT:
+				bla = m.constant->parent;
+				while (bla != nullptr) {
+					push_text(vformat("%s->", bla->get_type_name()));
+					bla = bla->parent;
+				}
+				push_text("ROOT ");
 				print_constant(m.constant);
 				break;
 			case ClassNode::Member::SIGNAL:
+				bla = m.signal->parent;
+				while (bla != nullptr) {
+					push_text(vformat("%s->", bla->get_type_name()));
+					bla = bla->parent;
+				}
+				push_text("ROOT ");
 				print_signal(m.signal);
 				break;
 			case ClassNode::Member::FUNCTION:
+				bla = m.function->parent;
+				while (bla != nullptr) {
+					push_text(vformat("%s->", bla->get_type_name()));
+					bla = bla->parent;
+				}
+				push_text("ROOT ");
 				print_function(m.function);
 				break;
 			case ClassNode::Member::ENUM:
+				bla = m.m_enum->parent;
+				while (bla != nullptr) {
+					push_text(vformat("%s->", bla->get_type_name()));
+					bla = bla->parent;
+				}
+				push_text("ROOT ");
 				print_enum(m.m_enum);
 				break;
 			case ClassNode::Member::ENUM_VALUE:
@@ -6323,6 +6369,13 @@ void GDScriptParser::TreePrinter::print_subscript(SubscriptNode *p_subscript) {
 }
 
 void GDScriptParser::TreePrinter::print_statement(Node *p_statement) {
+	Node *bla = p_statement->parent;
+	while (bla != nullptr) {
+		push_text(vformat("%s->", bla->get_type_name()));
+		bla = bla->parent;
+	}
+	push_text("ROOT ");
+
 	switch (p_statement->type) {
 		case Node::ASSERT:
 			print_assert(static_cast<AssertNode *>(p_statement));
@@ -6375,6 +6428,13 @@ void GDScriptParser::TreePrinter::print_statement(Node *p_statement) {
 }
 
 void GDScriptParser::TreePrinter::print_suite(SuiteNode *p_suite) {
+	Node *bla = p_suite->parent;
+	while (bla != nullptr) {
+		push_text(vformat("%s->", bla->get_type_name()));
+		bla = bla->parent;
+	}
+	push_text("ROOT ");
+
 	for (int i = 0; i < p_suite->statements.size(); i++) {
 		print_statement(p_suite->statements[i]);
 	}

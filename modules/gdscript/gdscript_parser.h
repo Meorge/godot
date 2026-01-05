@@ -344,7 +344,93 @@ public:
 		List<AnnotationNode *> annotations;
 
 #ifdef TOOLS_ENABLED
-		SuiteNode *suite_node = nullptr;
+		Node *parent = nullptr;
+		String get_type_name() const {
+			switch (type) {
+				case (Node::Type::NONE):
+					return String("NONE");
+				case (Node::Type::ANNOTATION):
+					return String("ANNOTATION");
+				case (Node::Type::ARRAY):
+					return String("ARRAY");
+				case (Node::Type::ASSERT):
+					return String("ASSERT");
+				case (Node::Type::ASSIGNMENT):
+					return String("ASSIGNMENT");
+				case (Node::Type::AWAIT):
+					return String("AWAIT");
+				case (Node::Type::BINARY_OPERATOR):
+					return String("BINARY_OPERATOR");
+				case (Node::Type::BREAK):
+					return String("BREAK");
+				case (Node::Type::BREAKPOINT):
+					return String("BREAKPOINT");
+				case (Node::Type::CALL):
+					return String("CALL");
+				case (Node::Type::CAST):
+					return String("CAST");
+				case (Node::Type::CLASS):
+					return String("CLASS");
+				case (Node::Type::CONSTANT):
+					return String("CONSTANT");
+				case (Node::Type::CONTINUE):
+					return String("CONTINUE");
+				case (Node::Type::DICTIONARY):
+					return String("DICTIONARY");
+				case (Node::Type::ENUM):
+					return String("ENUM");
+				case (Node::Type::FOR):
+					return String("FOR");
+				case (Node::Type::FUNCTION):
+					return String("FUNCTION");
+				case (Node::Type::GET_NODE):
+					return String("GET_NODE");
+				case (Node::Type::IDENTIFIER):
+					return String("IDENTIFIER");
+				case (Node::Type::IF):
+					return String("IF");
+				case (Node::Type::LAMBDA):
+					return String("LAMBDA");
+				case (Node::Type::LITERAL):
+					return String("LITERAL");
+				case (Node::Type::MATCH):
+					return String("MATCH");
+				case (Node::Type::MATCH_BRANCH):
+					return String("MATCH_BRANCH");
+				case (Node::Type::PARAMETER):
+					return String("PARAMETER");
+				case (Node::Type::PASS):
+					return String("PASS");
+				case (Node::Type::PATTERN):
+					return String("PATTERN");
+				case (Node::Type::PRELOAD):
+					return String("PRELOAD");
+				case (Node::Type::RETURN):
+					return String("RETURN");
+				case (Node::Type::SELF):
+					return String("SELF");
+				case (Node::Type::SIGNAL):
+					return String("SIGNAL");
+				case (Node::Type::SUBSCRIPT):
+					return String("SUBSCRIPT");
+				case (Node::Type::SUITE):
+					return String("SUITE");
+				case (Node::Type::TERNARY_OPERATOR):
+					return String("TERNARY_OPERATOR");
+				case (Node::Type::TYPE):
+					return String("TYPE");
+				case (Node::Type::TYPE_TEST):
+					return String("TYPE_TEST");
+				case (Node::Type::UNARY_OPERATOR):
+					return String("UNARY_OPERATOR");
+				case (Node::Type::VARIABLE):
+					return String("VARIABLE");
+				case (Node::Type::WHILE):
+					return String("WHILE");
+				default:
+					return String("???");
+			}
+		}
 #endif // TOOLS_ENABLED
 
 		DataType datatype;
@@ -1469,6 +1555,12 @@ private:
 
 		node->next = list;
 		list = node;
+
+#ifdef TOOLS_ENABLED
+		if (nodes_in_progress.size() > 0) {
+			node->parent = nodes_in_progress.back()->get();
+		}
+#endif // TOOLS_ENABLED
 
 		reset_extents(node, previous);
 		nodes_in_progress.push_back(node);
