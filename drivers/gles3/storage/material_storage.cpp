@@ -1334,6 +1334,9 @@ MaterialStorage::MaterialStorage() {
 		actions.renames["VIEW_RIGHT"] = "uint(1)";
 		actions.renames["EYE_OFFSET"] = "eye_offset";
 
+		actions.renames["view_to_model"] = "view_to_model";
+		actions.usage_defines["view_to_model"] = "\nvec4 view_to_model(vec4 p_view_coord) {\n\treturn vec4(1.0, 0.0, 1.0, 1.0);\n}\n";
+
 		//for light
 		actions.renames["VIEW"] = "view";
 		actions.renames["SPECULAR_AMOUNT"] = "specular_amount";

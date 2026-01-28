@@ -849,6 +849,12 @@ void SceneShaderForwardClustered::init(const String p_defines) {
 		actions.usage_defines["POINT_SIZE"] = "#define POINT_SIZE_USED\n";
 		actions.usage_defines["POINT_COORD"] = "#define POINT_COORD_USED\n";
 
+		actions.renames["view_to_model"] = "view_to_model";
+		actions.usage_defines["view_to_model"] = "\nvec4 view_to_model(vec4 p_view_coord) {\n\treturn vec4(1.0, 0.0, 1.0, 1.0);\n}\n";
+
+		// Attempt at making it a macro... didn't seem to work
+		// actions.usage_defines["view_to_model"] = "#define view_to_model(p_view_coord) (vec4(1.0, 0.0, 1.0, 1.0))\n";
+
 		actions.render_mode_defines["skip_vertex_transform"] = "#define SKIP_TRANSFORM_USED\n";
 		actions.render_mode_defines["world_vertex_coords"] = "#define VERTEX_WORLD_COORDS_USED\n";
 		actions.render_mode_defines["ensure_correct_normals"] = "#define ENSURE_CORRECT_NORMALS\n";

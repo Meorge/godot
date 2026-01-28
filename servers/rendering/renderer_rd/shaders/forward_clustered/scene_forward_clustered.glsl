@@ -184,6 +184,11 @@ layout(location = 14) out vec2 point_coord_interp;
 
 invariant gl_Position;
 
+// TODO
+vec4 view_to_model(vec4 p_view_coord) {
+	return p_view_coord;
+}
+
 #GLOBALS
 
 #ifdef USE_DOUBLE_PRECISION

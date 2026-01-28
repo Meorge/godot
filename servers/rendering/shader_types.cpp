@@ -199,6 +199,13 @@ ShaderTypes::ShaderTypes() {
 	shader_modes[RS::SHADER_SPATIAL].functions["fragment"].built_ins["ALPHA_ANTIALIASING_EDGE"] = ShaderLanguage::TYPE_FLOAT;
 	shader_modes[RS::SHADER_SPATIAL].functions["fragment"].built_ins["ALPHA_TEXTURE_COORDINATE"] = ShaderLanguage::TYPE_VEC2;
 
+	{
+		ShaderLanguage::StageFunctionInfo view_to_model_func;
+		view_to_model_func.arguments.push_back(ShaderLanguage::StageFunctionInfo::Argument("view_coord", ShaderLanguage::TYPE_VEC4));
+		view_to_model_func.return_type = ShaderLanguage::TYPE_VEC4;
+		shader_modes[RS::SHADER_SPATIAL].functions["fragment"].stage_functions["view_to_model"] = view_to_model_func;
+	}
+
 	shader_modes[RS::SHADER_SPATIAL].functions["light"].built_ins["MODEL_MATRIX"] = constt(ShaderLanguage::TYPE_MAT4);
 	shader_modes[RS::SHADER_SPATIAL].functions["light"].built_ins["VIEW_MATRIX"] = constt(ShaderLanguage::TYPE_MAT4);
 	shader_modes[RS::SHADER_SPATIAL].functions["light"].built_ins["INV_VIEW_MATRIX"] = constt(ShaderLanguage::TYPE_MAT4);
