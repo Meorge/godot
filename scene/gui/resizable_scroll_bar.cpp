@@ -441,11 +441,11 @@ double ResizableScrollBar::get_start_page_at_drag() {
 }
 
 double ResizableScrollBar::get_handle_size() {
-	return 2.5 * get_grabber_min_size();
+	return 4.0 * get_grabber_min_size();
 }
 
 double ResizableScrollBar::get_handle_min_size() {
-	return 2.5 * get_handle_size();
+	return 4.0 * get_handle_size();
 }
 
 double ResizableScrollBar::ratio_to_value(double p_value) {
