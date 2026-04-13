@@ -254,6 +254,19 @@ void GDScriptParser::push_error(const String &p_message, const Node *p_origin) {
 	errors.push_back(err);
 }
 
+void GDScriptParser::push_error(const String &p_message, int p_start_line, int p_start_column, int p_end_line, int p_end_column) {
+	panic_mode = true;
+	ParserError err;
+	err.message = p_message;
+
+	err.start_line = p_start_line;
+	err.start_column = p_start_column;
+	err.end_line = p_end_line;
+	err.end_column = p_end_column;
+
+	errors.push_back(err);
+}
+
 void GDScriptParser::push_error(const String &p_message, const GDScriptTokenizer::Token &p_origin) {
 	panic_mode = true;
 
@@ -283,6 +296,35 @@ void GDScriptParser::push_warning(const Node *p_source, GDScriptWarning::Code p_
 
 	PendingWarning pw;
 	pw.source = p_source;
+	pw.start_line = p_source->start_line;
+	pw.start_column = p_source->start_column;
+	pw.end_line = p_source->end_line;
+	pw.end_column = p_source->end_column;
+	pw.code = p_code;
+	pw.treated_as_error = warn_level == GDScriptWarning::ERROR;
+	pw.symbols = p_symbols;
+
+	pending_warnings.push_back(pw);
+}
+
+void GDScriptParser::push_warning(int p_start_line, int p_start_column, int p_end_line, int p_end_column, GDScriptWarning::Code p_code, const Vector<String> &p_symbols) {
+	ERR_FAIL_INDEX(p_code, GDScriptWarning::WARNING_MAX);
+
+	if (is_project_ignoring_warnings || is_script_ignoring_warnings) {
+		return;
+	}
+
+	const GDScriptWarning::WarnLevel warn_level = warning_levels[p_code];
+	if (warn_level == GDScriptWarning::IGNORE) {
+		return;
+	}
+
+	PendingWarning pw;
+	pw.source = nullptr;
+	pw.start_line = p_start_line;
+	pw.start_column = p_start_column;
+	pw.end_line = p_end_line;
+	pw.end_column = p_end_column;
 	pw.code = p_code;
 	pw.treated_as_error = warn_level == GDScriptWarning::ERROR;
 	pw.symbols = p_symbols;
@@ -292,23 +334,28 @@ void GDScriptParser::push_warning(const Node *p_source, GDScriptWarning::Code p_
 
 void GDScriptParser::apply_pending_warnings() {
 	for (const PendingWarning &pw : pending_warnings) {
-		if (warning_ignored_lines[pw.code].has(pw.source->start_line)) {
+		int start_line = pw.start_line;
+		int start_column = pw.start_column;
+		int end_line = pw.end_line;
+		int end_column = pw.end_column;
+
+		if (warning_ignored_lines[pw.code].has(start_line)) {
 			continue;
 		}
-		if (warning_ignore_start_lines[pw.code] <= pw.source->start_line) {
+		if (warning_ignore_start_lines[pw.code] <= start_line) {
 			continue;
 		}
 
 		GDScriptWarning warning;
 		warning.code = pw.code;
 		warning.symbols = pw.symbols;
-		warning.start_line = pw.source->start_line;
-		warning.start_column = pw.source->start_column;
-		warning.end_line = pw.source->end_line;
-		warning.end_column = pw.source->end_column;
+		warning.start_line = start_line;
+		warning.start_column = start_column;
+		warning.end_line = end_line;
+		warning.end_column = end_column;
 
 		if (pw.treated_as_error) {
-			push_error(warning.get_message() + String(" (Warning treated as error.)"), pw.source);
+			push_error(warning.get_message() + String(" (Warning treated as error.)"), start_line, start_column, end_line, end_column);
 			continue;
 		}
 
@@ -1799,6 +1846,10 @@ GDScriptParser::FunctionNode *GDScriptParser::parse_function(bool p_is_static) {
 	const int signature_start_pos = tokenizer->get_current_position();
 #endif // TOOLS_ENABLED
 
+	// Capture the function header starting with "func".
+	function->header_start_line = previous.start_line;
+	function->header_start_column = previous.start_column;
+
 	if (!consume(GDScriptTokenizer::Token::IDENTIFIER, R"(Expected function name after "func".)")) {
 		complete_extents(function);
 		return nullptr;
@@ -1828,6 +1879,9 @@ GDScriptParser::FunctionNode *GDScriptParser::parse_function(bool p_is_static) {
 #ifdef TOOLS_ENABLED
 	function->min_local_doc_line = previous.end_line + 1;
 #endif // TOOLS_ENABLED
+
+	function->header_end_line = previous.start_line;
+	function->header_end_column = previous.start_column;
 
 	if (!has_body) {
 		// Abstract functions do not have a body.
@@ -3741,6 +3795,10 @@ GDScriptParser::ExpressionNode *GDScriptParser::parse_lambda(ExpressionNode *p_p
 
 	function->is_static = current_function != nullptr ? current_function->is_static : false;
 
+	// Capture the lambda header starting with "func".
+	function->header_start_line = previous.start_line;
+	function->header_start_column = previous.start_column;
+
 	if (match(GDScriptTokenizer::Token::IDENTIFIER)) {
 		function->identifier = parse_identifier();
 	}
@@ -3776,6 +3834,12 @@ GDScriptParser::ExpressionNode *GDScriptParser::parse_lambda(ExpressionNode *p_p
 	current_suite = body;
 
 	parse_function_signature(function, body, "lambda", -1);
+
+	// Find the end of the lambda's header.
+	// The end column has 1 subtracted so that the range ends at the closing
+	// parenthesis rather than the colon.
+	function->header_end_line = previous.start_line;
+	function->header_end_column = previous.end_column - 1;
 
 	current_suite = previous_suite;
 
