@@ -35,7 +35,8 @@
 			<param index="0" name="mapping" type="String" />
 			<param index="1" name="update_existing" type="bool" default="false" />
 			<description>
-				Adds a new mapping entry (in SDL2 format) to the mapping database. Optionally update already connected devices.
+				Adds a new mapping entry in SDL2 format to the mapping database. This can also be used to update already-connected devices.
+				See the [url=https://wiki.libsdl.org/SDL2/SDL_GameControllerAddMapping#remarks]SDL2 documentation on mapping controllers[/url] for more specifics on the mapping format.
 			</description>
 		</method>
 		<method name="clear_joy_motion_sensors_calibration" experimental="">
