@@ -168,7 +168,9 @@ public:
 	int end_line;
 	int end_column;
 	Vector<String> symbols;
+#ifdef TOOLS_ENABLED
 	EditorLanguage::CodeActionGroup code_actions;
+#endif // TOOLS_ENABLED
 
 	String get_name() const;
 	String get_message() const;

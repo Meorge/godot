@@ -275,7 +275,9 @@ public:
 		int start_column;
 		int end_line;
 		int end_column;
+#ifdef TOOLS_ENABLED
 		EditorLanguage::CodeActionGroup code_actions;
+#endif // TOOLS_ENABLED
 	};
 
 #ifdef TOOLS_ENABLED
@@ -1509,7 +1511,9 @@ private:
 		GDScriptWarning::Code code = GDScriptWarning::WARNING_MAX;
 		bool treated_as_error = false;
 		Vector<String> symbols;
+#ifdef TOOLS_ENABLED
 		EditorLanguage::CodeActionGroup code_actions;
+#endif // TOOLS_ENABLED
 	};
 
 	static bool is_project_ignoring_warnings;
@@ -1640,11 +1644,17 @@ private:
 
 	void clear();
 
+#ifdef TOOLS_ENABLED
 	void push_error(const String &p_message, const Node *p_origin = nullptr, const EditorLanguage::CodeActionGroup &p_code_actions = {});
 	void push_error(const String &p_message, int p_start_line, int p_start_column, int p_end_line, int p_end_column, const EditorLanguage::CodeActionGroup &p_code_actions = {});
+#else
+	void push_error(const String &p_message, const Node *p_origin = nullptr);
+	void push_error(const String &p_message, int p_start_line, int p_start_column, int p_end_line, int p_end_column);
+#endif // TOOLS_ENABLED
 	void push_error(const String &p_message, const GDScriptTokenizer::Token &p_origin);
 
 #ifdef DEBUG_ENABLED
+#ifdef TOOLS_ENABLED
 	void push_warning(const Node *p_source, GDScriptWarning::Code p_code, const Vector<String> &p_symbols, const Vector<EditorLanguage::CodeActionOperation> &p_code_actions);
 	template <typename... Symbols>
 	void push_warning(const Node *p_source, GDScriptWarning::Code p_code, const Vector<EditorLanguage::CodeActionOperation> &p_code_actions = {}, const Symbols &...p_symbols) {
@@ -1655,6 +1665,18 @@ private:
 	void push_warning(int p_start_line, int p_start_column, int p_end_line, int p_end_column, GDScriptWarning::Code p_code, const Vector<EditorLanguage::CodeActionOperation> &p_code_actions = {}, const Symbols &...p_symbols) {
 		push_warning(p_start_line, p_start_column, p_end_line, p_end_column, p_code, Vector<String>{ p_symbols... }, p_code_actions);
 	}
+#else
+	void push_warning(const Node *p_source, GDScriptWarning::Code p_code, const Vector<String> &p_symbols);
+	template <typename... Symbols>
+	void push_warning(const Node *p_source, GDScriptWarning::Code p_code, const Symbols &...p_symbols) {
+		push_warning(p_source, p_code, Vector<String>{ p_symbols... });
+	}
+	void push_warning(int p_start_line, int p_start_column, int p_end_line, int p_end_column, GDScriptWarning::Code p_code, const Vector<String> &p_symbols);
+	template <typename... Symbols>
+	void push_warning(int p_start_line, int p_start_column, int p_end_line, int p_end_column, GDScriptWarning::Code p_code, const Symbols &...p_symbols) {
+		push_warning(p_start_line, p_start_column, p_end_line, p_end_column, p_code, Vector<String>{ p_symbols... });
+	}
+#endif // TOOLS_ENABLED
 	void apply_pending_warnings();
 	void evaluate_warning_directory_rules_for_script_path();
 #endif // DEBUG_ENABLED
