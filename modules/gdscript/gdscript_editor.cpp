@@ -2096,6 +2096,7 @@ static bool _guess_expression_type(GDScriptParser::CompletionContext &p_context,
 				const GDScriptParser::CallNode *call = static_cast<const GDScriptParser::CallNode *>(p_expression);
 				GDScriptParser::CompletionContext c = p_context;
 				c.current_line = call->start_line;
+				c.current_column = call->start_column;
 
 				GDScriptParser::Node::Type callee_type = call->get_callee_type();
 
@@ -2163,6 +2164,7 @@ static bool _guess_expression_type(GDScriptParser::CompletionContext &p_context,
 				if (subscript->is_attribute) {
 					GDScriptParser::CompletionContext c = p_context;
 					c.current_line = subscript->start_line;
+					c.current_column = subscript->start_column;
 
 					GDScriptCompletionIdentifier base;
 					if (!_guess_expression_type(c, subscript->base, base)) {
@@ -2209,6 +2211,7 @@ static bool _guess_expression_type(GDScriptParser::CompletionContext &p_context,
 
 					GDScriptParser::CompletionContext c = p_context;
 					c.current_line = subscript->start_line;
+					c.current_column = subscript->start_column;
 
 					GDScriptCompletionIdentifier base;
 					if (!_guess_expression_type(c, subscript->base, base)) {
@@ -2308,6 +2311,7 @@ static bool _guess_expression_type(GDScriptParser::CompletionContext &p_context,
 
 				GDScriptParser::CompletionContext context = p_context;
 				context.current_line = op->start_line;
+				context.current_column = op->start_column;
 
 				GDScriptCompletionIdentifier p1;
 				GDScriptCompletionIdentifier p2;
@@ -2495,6 +2499,7 @@ static bool _guess_identifier_type(GDScriptParser::CompletionContext &p_context,
 				// Bingo.
 				GDScriptParser::CompletionContext c = p_context;
 				c.current_line = type_test->operand->start_line;
+				c.current_column = type_test->operand->start_column;
 				c.current_suite = suite;
 				if (type_test->test_datatype.is_hard_type()) {
 					id_type.type = type_test->test_datatype;
@@ -2919,6 +2924,7 @@ static bool _guess_method_return_type_from_base(GDScriptParser::CompletionContex
 						_find_last_return_in_block(c, last_return_line, &last_returned_value);
 						if (last_returned_value) {
 							c.current_line = c.current_suite->end_line;
+							c.current_column = c.current_suite->end_column;
 							if (_guess_expression_type(c, last_returned_value, r_type)) {
 								return true;
 							}
@@ -3826,6 +3832,27 @@ static void _find_call_arguments(GDScriptParser::CompletionContext &p_context, c
 				method_hint += ":";
 
 				ScriptLanguage::CodeCompletionOption option(method_hint, ScriptLanguage::CODE_COMPLETION_KIND_FUNCTION);
+
+				// If we're renaming a function, we want to overwrite the text to
+				// the colon's position.
+				// TODO: How do we get the start column when the identifier is null?
+				ScriptLanguage::TextEdit t;
+				t.new_text = method_hint;
+				t.start_line = completion_context.current_line;
+				t.start_column = completion_context.current_column;
+
+				// Find the location of the colon.
+				// ISSUE: If there's no colon at the end of the line, then this
+				// will grab colons used inside the argument list for argument types.
+				String last_line_of_header = p_code.split("\n")[function_node->header_end_line - 1];
+				String last_line_of_header_actual_code = last_line_of_header.split("#", true, 1)[0];
+				int colon_col = last_line_of_header_actual_code.rfind_char(':') + 1;
+				if (colon_col < 0) {
+					colon_col = last_line_of_header_actual_code.size() - 1;
+				}
+				t.end_column = colon_col;
+				option.text_edit = t;
+
 				options.insert(option.display, option);
 			}
 		} break;

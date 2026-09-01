@@ -367,6 +367,7 @@ void GDScriptParser::override_completion_context(const Node *p_for_node, Complet
 	context.current_function = current_function;
 	context.current_suite = current_suite;
 	context.current_line = tokenizer->get_cursor_line();
+	context.current_column = tokenizer->get_cursor_column();
 	context.current_argument = p_argument;
 	context.node = p_node;
 	context.parser = this;
@@ -389,6 +390,7 @@ void GDScriptParser::make_completion_context(CompletionType p_type, Node *p_node
 	context.current_function = current_function;
 	context.current_suite = current_suite;
 	context.current_line = tokenizer->get_cursor_line();
+	context.current_column = tokenizer->get_cursor_column();
 	context.current_argument = p_argument;
 	context.node = p_node;
 	context.parser = this;
@@ -411,6 +413,7 @@ void GDScriptParser::make_completion_context(CompletionType p_type, Variant::Typ
 	context.current_function = current_function;
 	context.current_suite = current_suite;
 	context.current_line = tokenizer->get_cursor_line();
+	context.current_column = tokenizer->get_cursor_column();
 	context.builtin_type = p_builtin_type;
 	context.parser = this;
 	if (!completion_call_stack.is_empty()) {
