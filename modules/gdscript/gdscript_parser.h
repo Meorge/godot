@@ -286,6 +286,10 @@ public:
 		int end_line;
 		int end_column;
 #ifdef TOOLS_ENABLED
+		enum Type {
+			UNCLASSIFIED,
+			IDENTIFIER_NOT_DECLARED_IN_SCOPE
+		};
 		EditorLanguage::CodeActionGroup code_actions;
 #endif // TOOLS_ENABLED
 	};
@@ -1660,7 +1664,18 @@ private:
 	void push_error(const String &p_message, int p_start_line, int p_start_column, int p_end_line, int p_end_column);
 	void push_error(const String &p_message, const GDScriptTokenizer::Token &p_origin);
 #ifdef TOOLS_ENABLED
+	struct QueuedCodeActionRequest {
+		int error_index;
+		const Node *node;
+		ParserError::Type type;
+	};
+	LocalVector<QueuedCodeActionRequest> queued_code_action_requests;
 	void append_code_actions_to_last_error(const EditorLanguage::CodeActionGroup &p_code_action_group);
+	void queue_code_action_for_last_error(const Node *p_node, ParserError::Type p_err_type) {
+		QueuedCodeActionRequest a = { .error_index = errors.size() - 1, .node = p_node, .type = p_err_type };
+		queued_code_action_requests.push_back(a);
+	}
+	void resolve_code_actions();
 #endif // TOOLS_ENABLED
 
 #ifdef DEBUG_ENABLED

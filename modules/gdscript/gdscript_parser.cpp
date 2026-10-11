@@ -275,6 +275,28 @@ void GDScriptParser::append_code_actions_to_last_error(const EditorLanguage::Cod
 	ERR_FAIL_COND_MSG(errors.is_empty(), "There is no error for a code action group to be added to.");
 	errors.back()->get().code_actions = p_code_action_group;
 }
+
+void GDScriptParser::resolve_code_actions() {
+	for (const QueuedCodeActionRequest &request : queued_code_action_requests) {
+		switch (request.type) {
+			case ParserError::Type::IDENTIFIER_NOT_DECLARED_IN_SCOPE: {
+				Vector<PropertyInfo> arg_info;
+				const IdentifierNode *as_identifier = static_cast<const IdentifierNode *>(request.node);
+				if (GDScriptCodeActions::get_args_for_signal_connect(as_identifier, &arg_info)) {
+					PropertyInfo return_type; // Null
+					EditorLanguage::CodeActionOperation func_stub_op = GDScriptCodeActions::insert_function_stub(as_identifier, as_identifier->name, arg_info, return_type, script_path);
+					EditorLanguage::CodeActionGroup ca_group;
+					ca_group.title = TTR("Undefined function");
+					ca_group.actions.push_back(func_stub_op);
+					errors.get(request.error_index).code_actions = ca_group;
+				}
+				break;
+			}
+			default:
+				break;
+		}
+	}
+}
 #endif // TOOLS_ENABLED
 
 #ifdef DEBUG_ENABLED

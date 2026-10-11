@@ -4740,6 +4740,10 @@ void GDScriptAnalyzer::reduce_identifier(GDScriptParser::IdentifierNode *p_ident
 #else
 	push_error(vformat(R"(Identifier "%s" not declared in the current scope.)", name), p_identifier);
 #endif // SUGGEST_GODOT4_RENAMES
+
+#ifdef TOOLS_ENABLED
+	parser->queue_code_action_for_last_error(p_identifier, GDScriptParser::ParserError::Type::IDENTIFIER_NOT_DECLARED_IN_SCOPE);
+#endif
 	GDScriptParser::DataType dummy;
 	dummy.kind = GDScriptParser::DataType::VARIANT;
 	p_identifier->type_constraint = dummy; // Just so type is set to something.
@@ -6688,6 +6692,10 @@ Error GDScriptAnalyzer::resolve_body() {
 	// Apply here, after all `@warning_ignore`s have been resolved and applied.
 	parser->apply_pending_warnings();
 #endif // DEBUG_ENABLED
+
+#ifdef TOOLS_ENABLED
+	parser->resolve_code_actions();
+#endif // TOOLS_ENABLED
 
 	return parser->errors.is_empty() ? OK : ERR_PARSE_ERROR;
 }
